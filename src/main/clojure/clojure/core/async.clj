@@ -932,8 +932,9 @@ the Java system property `clojure.core.async.pool-size`."
            dchan (chan 1)
            dctr (atom nil)
            done (mapv (fn [i]
-                         (fn [ret]
-                           (aset rets i ret)
+                         (fn [err ret]
+                           (when-not err
+                             (aset rets i ret))
                            (when (zero? (swap! dctr dec))
                              (put! dchan (java.util.Arrays/copyOf rets cnt)))))
                        (range cnt))]
@@ -941,9 +942,9 @@ the Java system property `clojure.core.async.pool-size`."
          (reset! dctr cnt)
          (dotimes [i cnt]
            (try
-             (take! (chs i) (done i))
+             (take! (chs i) #((done i) nil %))
              (catch Exception e
-               (swap! dctr dec))))
+               ((done i) e))))
          (let [rets (<! dchan)]
            (if (some nil? rets)
              (close! out)
